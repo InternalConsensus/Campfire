@@ -9,6 +9,10 @@ import * as THREE from 'three';
 import { SceneManager } from '@core/SceneManager';
 import { CameraControls } from '@core/CameraControls';
 import { AnimationLoop } from '@core/AnimationLoop';
+import { createRockRing, disposeRockRing } from '@components/RockGenerator';
+import { createTeepee, disposeTeepee } from '@components/LogGenerator';
+import { createGround, createFirePit, disposeGround } from '@components/Ground';
+import { seed } from '@utils/noise';
 
 // ============================================================================
 // Loading Screen Management
@@ -42,6 +46,10 @@ interface AppState {
   animationLoop: AnimationLoop;
   fireLight: THREE.PointLight;
   firePlaceholder: THREE.Mesh;
+  rockRing: THREE.Group;
+  teepee: THREE.Group;
+  ground: THREE.Mesh;
+  firePit: THREE.Mesh;
 }
 
 let app: AppState | null = null;
@@ -99,20 +107,49 @@ function init(): AppState {
   sceneManager.add(fireLight);
   updateLoadingProgress(50);
 
-  // Ground plane (placeholder - will be procedural)
-  const groundGeometry = new THREE.CircleGeometry(10, 64);
-  const groundMaterial = new THREE.MeshStandardMaterial({
-    color: 0x1a1208,
-    roughness: 0.9,
-    metalness: 0.0,
+  // Set consistent seed for reproducible procedural generation
+  seed(12345);
+
+  // Procedural ground with height variation
+  const ground = createGround({
+    radius: 10,
+    segments: 64,
+    heightVariation: 0.08,
+    noiseFrequency: 0.4,
+    seed: 11111,
   });
-  const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-  ground.rotation.x = -Math.PI / 2;
-  ground.receiveShadow = true;
   sceneManager.add(ground);
+
+  // Fire pit depression
+  const firePit = createFirePit();
+  sceneManager.add(firePit);
   updateLoadingProgress(60);
 
-  // Placeholder fire (simple cone - will be replaced with shader)
+  // Procedural rock ring around campfire
+  const rockRing = createRockRing({
+    count: 10,
+    innerRadius: 1.4,
+    outerRadius: 1.8,
+    minScale: 0.4,
+    maxScale: 0.7,
+    seed: 22222,
+  });
+  sceneManager.add(rockRing);
+  updateLoadingProgress(70);
+
+  // Procedural log teepee
+  const teepee = createTeepee({
+    count: 5,
+    lengthRange: [1.5, 2.0],
+    radiusRange: [0.08, 0.12],
+    angle: 55,
+    angleVariation: 8,
+    meetingHeight: 0.9,
+    seed: 33333,
+  });
+  sceneManager.add(teepee);
+
+  // Placeholder fire (simple cone - will be replaced with shader in Phase 4)
   const fireGeometry = new THREE.ConeGeometry(0.5, 1.5, 16);
   const fireMaterial = new THREE.MeshBasicMaterial({
     color: 0xff4500,
@@ -122,25 +159,6 @@ function init(): AppState {
   const firePlaceholder = new THREE.Mesh(fireGeometry, fireMaterial);
   firePlaceholder.position.set(0, 0.75, 0);
   sceneManager.add(firePlaceholder);
-  updateLoadingProgress(70);
-
-  // Placeholder logs (simple cylinders - will be procedural)
-  const logGeometry = new THREE.CylinderGeometry(0.08, 0.1, 1.5, 8);
-  const logMaterial = new THREE.MeshStandardMaterial({
-    color: 0x3d2817,
-    roughness: 0.9,
-    metalness: 0.0,
-  });
-
-  for (let i = 0; i < 5; i++) {
-    const log = new THREE.Mesh(logGeometry, logMaterial);
-    const angle = (i / 5) * Math.PI * 2;
-    log.position.set(Math.cos(angle) * 0.3, 0.4, Math.sin(angle) * 0.3);
-    log.rotation.z = Math.PI / 4 + (Math.random() - 0.5) * 0.2;
-    log.rotation.y = angle;
-    log.castShadow = true;
-    sceneManager.add(log);
-  }
   updateLoadingProgress(80);
 
   // ============================================================================
@@ -175,6 +193,10 @@ function init(): AppState {
     animationLoop,
     fireLight,
     firePlaceholder,
+    rockRing,
+    teepee,
+    ground,
+    firePit,
   };
 }
 
@@ -216,6 +238,13 @@ try {
 
 window.addEventListener('beforeunload', () => {
   if (app) {
+    // Dispose procedural components
+    disposeRockRing(app.rockRing);
+    disposeTeepee(app.teepee);
+    disposeGround(app.ground);
+    disposeGround(app.firePit);
+    
+    // Dispose core systems
     app.animationLoop.dispose();
     app.cameraControls.dispose();
     app.sceneManager.dispose();
