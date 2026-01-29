@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import { SceneManager } from '@core/SceneManager';
 import { CameraControls } from '@core/CameraControls';
 import { AnimationLoop } from '@core/AnimationLoop';
+import { Lighting, configureShadowRenderer, enableShadowCasting, enableShadowReceiving, enableShadows } from '@core/Lighting';
 import { createRockRing, disposeRockRing } from '@components/RockGenerator';
 import { createTeepee, disposeTeepee } from '@components/LogGenerator';
 import { createGround, createFirePit, disposeGround } from '@components/Ground';
@@ -47,7 +48,7 @@ interface AppState {
   sceneManager: SceneManager;
   cameraControls: CameraControls;
   animationLoop: AnimationLoop;
-  fireLight: THREE.PointLight;
+  lighting: Lighting;
   fire: Fire;
   embers: EmberSystem;
   smoke: SmokeSystem;
@@ -98,18 +99,32 @@ function init(): AppState {
   // Scene Content
   // ============================================================================
 
-  // Ambient light (very dim, simulating night)
-  const ambientLight = new THREE.AmbientLight(0x1a1a2e, 0.1);
-  sceneManager.add(ambientLight);
+  // Configure renderer for shadows
+  configureShadowRenderer(sceneManager.renderer);
 
-  // Fire point light (animated in update loop)
-  const fireLight = new THREE.PointLight(0xff6622, 2.5, 15, 2);
-  fireLight.position.set(0, 1, 0);
-  fireLight.castShadow = true;
-  fireLight.shadow.mapSize.set(1024, 1024);
-  fireLight.shadow.camera.near = 0.1;
-  fireLight.shadow.camera.far = 15;
-  sceneManager.add(fireLight);
+  // Initialize lighting system (fire light, moonlight, ambient)
+  const lighting = new Lighting({
+    fireLight: {
+      color: new THREE.Color(0xff6622),
+      baseIntensity: 2.5,
+      intensityVariation: 1.0,
+      distance: 15,
+      decay: 2,
+      position: new THREE.Vector3(0, 1.0, 0),
+      positionOffsetMax: 0.05,
+      shadowMapSize: 1024,
+    },
+    moonlight: {
+      color: new THREE.Color(0xaaccff),
+      intensity: 0.12,
+      direction: new THREE.Vector3(1, 2, 0.5).normalize(),
+    },
+    ambient: {
+      color: new THREE.Color(0x0a0a1a),
+      intensity: 0.08,
+    },
+  });
+  sceneManager.add(lighting.getObject());
   updateLoadingProgress(50);
 
   // Set consistent seed for reproducible procedural generation
@@ -123,10 +138,12 @@ function init(): AppState {
     noiseFrequency: 0.4,
     seed: 11111,
   });
+  enableShadowReceiving(ground); // Ground receives shadows
   sceneManager.add(ground);
 
   // Fire pit depression
   const firePit = createFirePit();
+  enableShadowReceiving(firePit); // Fire pit receives shadows
   sceneManager.add(firePit);
   updateLoadingProgress(60);
 
@@ -139,6 +156,7 @@ function init(): AppState {
     maxScale: 0.7,
     seed: 22222,
   });
+  enableShadows(rockRing); // Rocks cast and receive shadows
   sceneManager.add(rockRing);
   updateLoadingProgress(70);
 
@@ -152,6 +170,7 @@ function init(): AppState {
     meetingHeight: 0.9,
     seed: 33333,
   });
+  enableShadowCasting(teepee); // Logs cast shadows
   sceneManager.add(teepee);
 
   // Procedural fire with custom shaders
@@ -198,7 +217,7 @@ function init(): AppState {
   // ============================================================================
 
   // Register update callback for animations
-  animationLoop.addUpdateCallback((deltaTime, elapsedTime) => {
+  animationLoop.addUpdateCallback((deltaTime) => {
     // Update fire animation
     fire.update(deltaTime);
 
@@ -208,16 +227,8 @@ function init(): AppState {
     // Update smoke particles
     smoke.update(deltaTime);
 
-    // Animate fire light flicker
-    const flicker =
-      Math.sin(elapsedTime * 8) * 0.15 +
-      Math.sin(elapsedTime * 13) * 0.1 +
-      Math.sin(elapsedTime * 23) * 0.05;
-    fireLight.intensity = 2.5 + flicker;
-
-    // Slight color temperature variation
-    const colorFlicker = 0.02 * Math.sin(elapsedTime * 5);
-    fireLight.color.setHSL(0.07 + colorFlicker, 1, 0.5);
+    // Update lighting (flickering, position offset)
+    lighting.update(deltaTime);
 
     // Update camera controls
     cameraControls.update();
@@ -229,7 +240,7 @@ function init(): AppState {
     sceneManager,
     cameraControls,
     animationLoop,
-    fireLight,
+    lighting,
     fire,
     embers,
     smoke,
@@ -286,6 +297,7 @@ window.addEventListener('beforeunload', () => {
     app.fire.dispose();
     app.embers.dispose();
     app.smoke.dispose();
+    app.lighting.dispose();
     
     // Dispose core systems
     app.animationLoop.dispose();
