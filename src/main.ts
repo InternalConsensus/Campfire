@@ -14,6 +14,7 @@ import { createTeepee, disposeTeepee } from '@components/LogGenerator';
 import { createGround, createFirePit, disposeGround } from '@components/Ground';
 import { Fire } from '@components/Fire';
 import { EmberSystem } from '@components/EmberSystem';
+import { SmokeSystem } from '@components/SmokeSystem';
 import { seed } from '@utils/noise';
 
 // ============================================================================
@@ -49,6 +50,7 @@ interface AppState {
   fireLight: THREE.PointLight;
   fire: Fire;
   embers: EmberSystem;
+  smoke: SmokeSystem;
   rockRing: THREE.Group;
   teepee: THREE.Group;
   ground: THREE.Mesh;
@@ -175,6 +177,20 @@ function init(): AppState {
     spawnRate: 60,
   });
   sceneManager.add(embers.getObject());
+
+  // Smoke particle system
+  const smoke = new SmokeSystem({
+    maxParticles: 300,
+    spawnRate: 15,
+    baseSize: 1.0,
+    spawnRadius: 0.3,
+    spawnHeight: 1.8,
+    minLifetime: 4.0,
+    maxLifetime: 6.0,
+    turbulenceStrength: 0.3,
+    wind: new THREE.Vector3(0.1, 0, 0.05),
+  });
+  sceneManager.add(smoke.getObject());
   updateLoadingProgress(80);
 
   // ============================================================================
@@ -188,6 +204,9 @@ function init(): AppState {
 
     // Update ember particles
     embers.update(deltaTime);
+
+    // Update smoke particles
+    smoke.update(deltaTime);
 
     // Animate fire light flicker
     const flicker =
@@ -213,6 +232,7 @@ function init(): AppState {
     fireLight,
     fire,
     embers,
+    smoke,
     rockRing,
     teepee,
     ground,
@@ -265,6 +285,7 @@ window.addEventListener('beforeunload', () => {
     disposeGround(app.firePit);
     app.fire.dispose();
     app.embers.dispose();
+    app.smoke.dispose();
     
     // Dispose core systems
     app.animationLoop.dispose();
