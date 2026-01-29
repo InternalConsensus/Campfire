@@ -2,11 +2,13 @@
  * Campfire - High-Fidelity WebGL Experience
  * 
  * Entry point for the application.
- * Initializes Three.js scene and starts the render loop.
+ * Initializes core systems and starts the render loop.
  */
 
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { SceneManager } from '@core/SceneManager';
+import { CameraControls } from '@core/CameraControls';
+import { AnimationLoop } from '@core/AnimationLoop';
 
 // ============================================================================
 // Loading Screen Management
@@ -31,186 +33,192 @@ function hideLoadingScreen(): void {
 }
 
 // ============================================================================
-// Scene Setup
+// Application State
 // ============================================================================
 
-updateLoadingProgress(10);
-
-// Get container
-const container = document.getElementById('app');
-if (!container) {
-  throw new Error('Could not find #app container');
+interface AppState {
+  sceneManager: SceneManager;
+  cameraControls: CameraControls;
+  animationLoop: AnimationLoop;
+  fireLight: THREE.PointLight;
+  firePlaceholder: THREE.Mesh;
 }
 
-// Create scene
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0a0604);
-
-updateLoadingProgress(20);
-
-// Create camera
-// FOV 50, positioned to view campfire from slight angle
-const camera = new THREE.PerspectiveCamera(
-  50,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  100
-);
-camera.position.set(0, 3, 8);
-camera.lookAt(0, 1, 0);
-
-updateLoadingProgress(30);
-
-// Create renderer
-const renderer = new THREE.WebGLRenderer({
-  antialias: true,
-  alpha: true,
-  powerPreference: 'high-performance',
-});
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
-container.appendChild(renderer.domElement);
-
-updateLoadingProgress(40);
-
-// Create controls
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.dampingFactor = 0.05;
-controls.minDistance = 3;
-controls.maxDistance = 15;
-controls.maxPolarAngle = Math.PI / 2; // Don't go below ground
-controls.target.set(0, 1, 0);
-controls.update();
-
-updateLoadingProgress(50);
+let app: AppState | null = null;
 
 // ============================================================================
-// Temporary Scene Content (Placeholder)
+// Initialization
 // ============================================================================
 
-// Ambient light (very dim, simulating night)
-const ambientLight = new THREE.AmbientLight(0x1a1a2e, 0.1);
-scene.add(ambientLight);
+function init(): AppState {
+  updateLoadingProgress(10);
 
-// Fire point light (will be animated later)
-const fireLight = new THREE.PointLight(0xff6622, 2.5, 15, 2);
-fireLight.position.set(0, 1, 0);
-fireLight.castShadow = true;
-fireLight.shadow.mapSize.set(1024, 1024);
-fireLight.shadow.camera.near = 0.1;
-fireLight.shadow.camera.far = 15;
-scene.add(fireLight);
+  // Get container
+  const container = document.getElementById('app');
+  if (!container) {
+    throw new Error('Could not find #app container');
+  }
 
-updateLoadingProgress(60);
+  // Initialize SceneManager
+  const sceneManager = SceneManager.init({ container });
+  updateLoadingProgress(20);
 
-// Ground plane (placeholder - will be procedural)
-const groundGeometry = new THREE.CircleGeometry(10, 64);
-const groundMaterial = new THREE.MeshStandardMaterial({
-  color: 0x1a1208,
-  roughness: 0.9,
-  metalness: 0.0,
-});
-const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-ground.rotation.x = -Math.PI / 2;
-ground.receiveShadow = true;
-scene.add(ground);
+  // Initialize CameraControls
+  const cameraControls = new CameraControls({
+    camera: sceneManager.camera,
+    domElement: sceneManager.renderer.domElement,
+    target: new THREE.Vector3(0, 1, 0),
+    minDistance: 3,
+    maxDistance: 15,
+    maxPolarAngle: Math.PI / 2,
+  });
+  updateLoadingProgress(30);
 
-updateLoadingProgress(70);
+  // Initialize AnimationLoop
+  const animationLoop = new AnimationLoop({
+    showFPS: true, // Enable for development
+    onRender: () => sceneManager.render(),
+  });
+  updateLoadingProgress(40);
 
-// Placeholder fire (simple glowing sphere - will be replaced with shader)
-const fireGeometry = new THREE.ConeGeometry(0.5, 1.5, 16);
-const fireMaterial = new THREE.MeshBasicMaterial({
-  color: 0xff4500,
-  transparent: true,
-  opacity: 0.8,
-});
-const firePlaceholder = new THREE.Mesh(fireGeometry, fireMaterial);
-firePlaceholder.position.set(0, 0.75, 0);
-scene.add(firePlaceholder);
+  // ============================================================================
+  // Scene Content
+  // ============================================================================
 
-updateLoadingProgress(80);
+  // Ambient light (very dim, simulating night)
+  const ambientLight = new THREE.AmbientLight(0x1a1a2e, 0.1);
+  sceneManager.add(ambientLight);
 
-// Placeholder logs (simple cylinders - will be procedural)
-const logGeometry = new THREE.CylinderGeometry(0.08, 0.1, 1.5, 8);
-const logMaterial = new THREE.MeshStandardMaterial({
-  color: 0x3d2817,
-  roughness: 0.9,
-  metalness: 0.0,
-});
+  // Fire point light (animated in update loop)
+  const fireLight = new THREE.PointLight(0xff6622, 2.5, 15, 2);
+  fireLight.position.set(0, 1, 0);
+  fireLight.castShadow = true;
+  fireLight.shadow.mapSize.set(1024, 1024);
+  fireLight.shadow.camera.near = 0.1;
+  fireLight.shadow.camera.far = 15;
+  sceneManager.add(fireLight);
+  updateLoadingProgress(50);
 
-for (let i = 0; i < 5; i++) {
-  const log = new THREE.Mesh(logGeometry, logMaterial);
-  const angle = (i / 5) * Math.PI * 2;
-  log.position.set(Math.cos(angle) * 0.3, 0.4, Math.sin(angle) * 0.3);
-  log.rotation.z = Math.PI / 4 + (Math.random() - 0.5) * 0.2;
-  log.rotation.y = angle;
-  log.castShadow = true;
-  scene.add(log);
+  // Ground plane (placeholder - will be procedural)
+  const groundGeometry = new THREE.CircleGeometry(10, 64);
+  const groundMaterial = new THREE.MeshStandardMaterial({
+    color: 0x1a1208,
+    roughness: 0.9,
+    metalness: 0.0,
+  });
+  const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  sceneManager.add(ground);
+  updateLoadingProgress(60);
+
+  // Placeholder fire (simple cone - will be replaced with shader)
+  const fireGeometry = new THREE.ConeGeometry(0.5, 1.5, 16);
+  const fireMaterial = new THREE.MeshBasicMaterial({
+    color: 0xff4500,
+    transparent: true,
+    opacity: 0.8,
+  });
+  const firePlaceholder = new THREE.Mesh(fireGeometry, fireMaterial);
+  firePlaceholder.position.set(0, 0.75, 0);
+  sceneManager.add(firePlaceholder);
+  updateLoadingProgress(70);
+
+  // Placeholder logs (simple cylinders - will be procedural)
+  const logGeometry = new THREE.CylinderGeometry(0.08, 0.1, 1.5, 8);
+  const logMaterial = new THREE.MeshStandardMaterial({
+    color: 0x3d2817,
+    roughness: 0.9,
+    metalness: 0.0,
+  });
+
+  for (let i = 0; i < 5; i++) {
+    const log = new THREE.Mesh(logGeometry, logMaterial);
+    const angle = (i / 5) * Math.PI * 2;
+    log.position.set(Math.cos(angle) * 0.3, 0.4, Math.sin(angle) * 0.3);
+    log.rotation.z = Math.PI / 4 + (Math.random() - 0.5) * 0.2;
+    log.rotation.y = angle;
+    log.castShadow = true;
+    sceneManager.add(log);
+  }
+  updateLoadingProgress(80);
+
+  // ============================================================================
+  // Update Callbacks
+  // ============================================================================
+
+  // Register update callback for animations
+  animationLoop.addUpdateCallback((deltaTime, elapsedTime) => {
+    // Animate fire light flicker
+    const flicker =
+      Math.sin(elapsedTime * 8) * 0.15 +
+      Math.sin(elapsedTime * 13) * 0.1 +
+      Math.sin(elapsedTime * 23) * 0.05;
+    fireLight.intensity = 2.5 + flicker;
+
+    // Slight color temperature variation
+    const colorFlicker = 0.02 * Math.sin(elapsedTime * 5);
+    fireLight.color.setHSL(0.07 + colorFlicker, 1, 0.5);
+
+    // Rotate placeholder fire slightly for visual interest
+    firePlaceholder.rotation.y = elapsedTime * 0.5;
+
+    // Update camera controls
+    cameraControls.update();
+  });
+
+  updateLoadingProgress(90);
+
+  return {
+    sceneManager,
+    cameraControls,
+    animationLoop,
+    fireLight,
+    firePlaceholder,
+  };
 }
-
-updateLoadingProgress(90);
-
-// ============================================================================
-// Animation Loop
-// ============================================================================
-
-const clock = new THREE.Clock();
-
-function animate(): void {
-  requestAnimationFrame(animate);
-
-  const elapsed = clock.getElapsedTime();
-
-  // Animate fire light flicker
-  const flicker =
-    Math.sin(elapsed * 8) * 0.15 +
-    Math.sin(elapsed * 13) * 0.1 +
-    Math.sin(elapsed * 23) * 0.05;
-  fireLight.intensity = 2.5 + flicker;
-
-  // Slight color temperature variation
-  const colorFlicker = 0.02 * Math.sin(elapsed * 5);
-  fireLight.color.setHSL(0.07 + colorFlicker, 1, 0.5);
-
-  // Rotate placeholder fire slightly for visual interest
-  firePlaceholder.rotation.y = elapsed * 0.5;
-
-  // Update controls
-  controls.update();
-
-  // Render
-  renderer.render(scene, camera);
-}
-
-// ============================================================================
-// Window Resize Handler
-// ============================================================================
-
-function onWindowResize(): void {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-}
-
-window.addEventListener('resize', onWindowResize);
 
 // ============================================================================
 // Start Application
 // ============================================================================
 
-updateLoadingProgress(100);
+try {
+  app = init();
+  updateLoadingProgress(100);
 
-// Hide loading screen after a brief moment
-setTimeout(() => {
-  hideLoadingScreen();
-  animate();
-}, 500);
+  // Hide loading screen after a brief moment
+  setTimeout(() => {
+    hideLoadingScreen();
+    app?.animationLoop.start();
+  }, 500);
 
-// Log for development
-console.log('🔥 Campfire initialized');
-console.log('Three.js version:', THREE.REVISION);
+  // Log for development
+  console.log('🔥 Campfire initialized');
+  console.log('Three.js version:', THREE.REVISION);
+
+  // Expose app to window for debugging
+  if (import.meta.env.DEV) {
+    (window as unknown as { app: AppState }).app = app;
+  }
+} catch (error) {
+  console.error('Failed to initialize Campfire:', error);
+  if (loadingScreen) {
+    const loadingText = loadingScreen.querySelector('.loading-text');
+    if (loadingText) {
+      loadingText.textContent = 'Failed to load. Please refresh.';
+    }
+  }
+}
+
+// ============================================================================
+// Cleanup on page unload
+// ============================================================================
+
+window.addEventListener('beforeunload', () => {
+  if (app) {
+    app.animationLoop.dispose();
+    app.cameraControls.dispose();
+    app.sceneManager.dispose();
+    app = null;
+  }
+});
