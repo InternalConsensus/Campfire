@@ -1,15 +1,17 @@
 {
   "name": "campfire",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "High-fidelity WebGL campfire experience using Three.js",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
+  "keywords": ["threejs", "webgl", "campfire", "procedural"],
+  "author": "Brian",
+  "license": "MIT",
   "devDependencies": {
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
