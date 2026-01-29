@@ -12,6 +12,7 @@ import { AnimationLoop } from '@core/AnimationLoop';
 import { createRockRing, disposeRockRing } from '@components/RockGenerator';
 import { createTeepee, disposeTeepee } from '@components/LogGenerator';
 import { createGround, createFirePit, disposeGround } from '@components/Ground';
+import { Fire } from '@components/Fire';
 import { seed } from '@utils/noise';
 
 // ============================================================================
@@ -45,7 +46,7 @@ interface AppState {
   cameraControls: CameraControls;
   animationLoop: AnimationLoop;
   fireLight: THREE.PointLight;
-  firePlaceholder: THREE.Mesh;
+  fire: Fire;
   rockRing: THREE.Group;
   teepee: THREE.Group;
   ground: THREE.Mesh;
@@ -149,16 +150,16 @@ function init(): AppState {
   });
   sceneManager.add(teepee);
 
-  // Placeholder fire (simple cone - will be replaced with shader in Phase 4)
-  const fireGeometry = new THREE.ConeGeometry(0.5, 1.5, 16);
-  const fireMaterial = new THREE.MeshBasicMaterial({
-    color: 0xff4500,
-    transparent: true,
-    opacity: 0.8,
+  // Procedural fire with custom shaders
+  const fire = new Fire({
+    height: 2.2,
+    radius: 0.55,
+    intensity: 1.0,
+    noiseScale: 2.5,
+    scrollSpeed: 2.0,
+    displacement: 0.2,
   });
-  const firePlaceholder = new THREE.Mesh(fireGeometry, fireMaterial);
-  firePlaceholder.position.set(0, 0.75, 0);
-  sceneManager.add(firePlaceholder);
+  sceneManager.add(fire.getObject());
   updateLoadingProgress(80);
 
   // ============================================================================
@@ -167,6 +168,9 @@ function init(): AppState {
 
   // Register update callback for animations
   animationLoop.addUpdateCallback((deltaTime, elapsedTime) => {
+    // Update fire animation
+    fire.update(deltaTime);
+
     // Animate fire light flicker
     const flicker =
       Math.sin(elapsedTime * 8) * 0.15 +
@@ -177,9 +181,6 @@ function init(): AppState {
     // Slight color temperature variation
     const colorFlicker = 0.02 * Math.sin(elapsedTime * 5);
     fireLight.color.setHSL(0.07 + colorFlicker, 1, 0.5);
-
-    // Rotate placeholder fire slightly for visual interest
-    firePlaceholder.rotation.y = elapsedTime * 0.5;
 
     // Update camera controls
     cameraControls.update();
@@ -192,7 +193,7 @@ function init(): AppState {
     cameraControls,
     animationLoop,
     fireLight,
-    firePlaceholder,
+    fire,
     rockRing,
     teepee,
     ground,
@@ -243,6 +244,7 @@ window.addEventListener('beforeunload', () => {
     disposeTeepee(app.teepee);
     disposeGround(app.ground);
     disposeGround(app.firePit);
+    app.fire.dispose();
     
     // Dispose core systems
     app.animationLoop.dispose();
