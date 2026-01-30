@@ -3,11 +3,10 @@
  * 
  * Cinematic post-processing effects for photorealistic rendering:
  * - Bloom for fire glow
- * - Depth of Field for background blur
  * - Vignette for cinematic framing
- * - Color grading for warmth
  * - Film grain for texture
- * - Chromatic aberration for realism
+ * - SMAA anti-aliasing
+ * - ACES Filmic tone mapping
  */
 
 import * as THREE from 'three';
@@ -18,14 +17,12 @@ import {
   BloomEffect,
   VignetteEffect,
   NoiseEffect,
-  ChromaticAberrationEffect,
   ToneMappingEffect,
   ToneMappingMode,
   BlendFunction,
   KernelSize,
   SMAAEffect,
   SMAAPreset,
-  DepthOfFieldEffect,
 } from 'postprocessing';
 
 /** Configuration for bloom effect */
@@ -125,23 +122,19 @@ export class PostProcessing {
   
   // Individual effects for runtime control
   private readonly bloomEffect: BloomEffect;
-  private readonly dofEffect: DepthOfFieldEffect;
   private readonly vignetteEffect: VignetteEffect;
   private readonly noiseEffect: NoiseEffect;
-  private readonly chromaticEffect: ChromaticAberrationEffect;
   private readonly smaaEffect: SMAAEffect | null;
   private readonly toneMappingEffect: ToneMappingEffect | null;
 
   // Effect passes for toggling
-  private readonly effectPass: EffectPass;
+  private readonly mainEffectPass: EffectPass;
 
   // Track enabled state for each effect
   private effectsEnabled = {
     bloom: true,
-    dof: true,
     vignette: true,
     grain: true,
-    chromatic: true,
     smaa: true,
     toneMapping: true,
   };
@@ -185,13 +178,6 @@ export class PostProcessing {
       mipmapBlur: this.config.bloom.mipmapBlur,
     });
 
-    // Depth of Field for background blur
-    this.dofEffect = new DepthOfFieldEffect(camera, {
-      focusDistance: this.config.dof.focusDistance,
-      focalLength: this.config.dof.focalLength,
-      bokehScale: this.config.dof.bokehScale,
-    });
-
     // Vignette for cinematic framing
     this.vignetteEffect = new VignetteEffect({
       offset: this.config.vignette.offset,
@@ -203,13 +189,6 @@ export class PostProcessing {
       blendFunction: this.config.grain.blendFunction,
     });
     this.noiseEffect.blendMode.opacity.value = 0.15;
-
-    // Chromatic aberration for realism
-    this.chromaticEffect = new ChromaticAberrationEffect({
-      offset: this.config.chromatic.offset,
-      radialModulation: this.config.chromatic.radialModulation,
-      modulationOffset: 0.5,
-    });
 
     // SMAA anti-aliasing
     this.smaaEffect = this.config.enableSMAA
@@ -224,14 +203,14 @@ export class PostProcessing {
       : null;
 
     // =========================================================================
-    // Build Effect Pass
+    // Build Effect Passes
+    // Note: Convolution effects (DOF, ChromaticAberration) removed to avoid
+    // merge conflicts. They can be added back in separate passes if needed.
     // =========================================================================
 
-    const effects: (BloomEffect | DepthOfFieldEffect | VignetteEffect | NoiseEffect | ChromaticAberrationEffect | SMAAEffect | ToneMappingEffect)[] = [
+    const effects: (BloomEffect | VignetteEffect | NoiseEffect | SMAAEffect | ToneMappingEffect)[] = [
       this.bloomEffect,
-      this.dofEffect,
       this.vignetteEffect,
-      this.chromaticEffect,
       this.noiseEffect,
     ];
 
@@ -243,8 +222,8 @@ export class PostProcessing {
       effects.push(this.toneMappingEffect);
     }
 
-    this.effectPass = new EffectPass(camera, ...effects);
-    this.composer.addPass(this.effectPass);
+    this.mainEffectPass = new EffectPass(camera, ...effects);
+    this.composer.addPass(this.mainEffectPass);
   }
 
   /**
@@ -277,21 +256,6 @@ export class PostProcessing {
   }
 
   /**
-   * Toggle depth of field
-   */
-  setDOFEnabled(enabled: boolean): void {
-    this.effectsEnabled.dof = enabled;
-    this.dofEffect.blendMode.opacity.value = enabled ? 1 : 0;
-  }
-
-  /**
-   * Set DOF focus distance
-   */
-  setFocusDistance(distance: number): void {
-    this.dofEffect.cocMaterial.uniforms.focusDistance.value = distance;
-  }
-
-  /**
    * Toggle vignette
    */
   setVignetteEnabled(enabled: boolean): void {
@@ -308,22 +272,12 @@ export class PostProcessing {
   }
 
   /**
-   * Toggle chromatic aberration
-   */
-  setChromaticEnabled(enabled: boolean): void {
-    this.effectsEnabled.chromatic = enabled;
-    this.chromaticEffect.blendMode.opacity.value = enabled ? 1 : 0;
-  }
-
-  /**
    * Disable all effects (for performance testing)
    */
   disableAll(): void {
     this.setBloomEnabled(false);
-    this.setDOFEnabled(false);
     this.setVignetteEnabled(false);
     this.setGrainEnabled(false);
-    this.setChromaticEnabled(false);
   }
 
   /**
@@ -331,10 +285,8 @@ export class PostProcessing {
    */
   enableAll(): void {
     this.setBloomEnabled(true);
-    this.setDOFEnabled(true);
     this.setVignetteEnabled(true);
     this.setGrainEnabled(true);
-    this.setChromaticEnabled(true);
   }
 
   /**
