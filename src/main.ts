@@ -73,8 +73,11 @@ function init(): AppState {
     throw new Error('Could not find #app container');
   }
 
-  // Initialize SceneManager
-  const sceneManager = SceneManager.init({ container });
+  // Initialize SceneManager with post-processing enabled
+  const sceneManager = SceneManager.init({ 
+    container,
+    enablePostProcessing: true,
+  });
   updateLoadingProgress(20);
 
   // Initialize CameraControls
@@ -91,7 +94,7 @@ function init(): AppState {
   // Initialize AnimationLoop
   const animationLoop = new AnimationLoop({
     showFPS: true, // Enable for development
-    onRender: () => sceneManager.render(),
+    onRender: (deltaTime) => sceneManager.render(deltaTime),
   });
   updateLoadingProgress(40);
 

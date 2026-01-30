@@ -6,6 +6,7 @@
  */
 
 import * as THREE from 'three';
+import { PostProcessing } from './PostProcessing';
 
 export interface SceneManagerOptions {
   readonly container: HTMLElement;
@@ -14,6 +15,7 @@ export interface SceneManagerOptions {
   readonly far?: number;
   readonly antialias?: boolean;
   readonly alpha?: boolean;
+  readonly enablePostProcessing?: boolean;
 }
 
 export class SceneManager {
@@ -22,12 +24,15 @@ export class SceneManager {
   public readonly scene: THREE.Scene;
   public readonly camera: THREE.PerspectiveCamera;
   public readonly renderer: THREE.WebGLRenderer;
+  public readonly postProcessing: PostProcessing | null;
 
   private readonly container: HTMLElement;
   private readonly resizeHandler: () => void;
+  private readonly usePostProcessing: boolean;
 
   private constructor(options: SceneManagerOptions) {
     this.container = options.container;
+    this.usePostProcessing = options.enablePostProcessing ?? true;
 
     // Create scene
     this.scene = new THREE.Scene();
@@ -53,6 +58,17 @@ export class SceneManager {
 
     this.configureRenderer();
     this.container.appendChild(this.renderer.domElement);
+
+    // Initialize post-processing
+    if (this.usePostProcessing) {
+      this.postProcessing = new PostProcessing(
+        this.renderer,
+        this.scene,
+        this.camera
+      );
+    } else {
+      this.postProcessing = null;
+    }
 
     // Bind resize handler
     this.resizeHandler = this.onResize.bind(this);
@@ -114,13 +130,21 @@ export class SceneManager {
     this.camera.aspect = this.getAspect();
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    
+    if (this.postProcessing) {
+      this.postProcessing.setSize(window.innerWidth, window.innerHeight);
+    }
   }
 
   /**
    * Render current frame
    */
-  public render(): void {
-    this.renderer.render(this.scene, this.camera);
+  public render(deltaTime: number = 0): void {
+    if (this.postProcessing) {
+      this.postProcessing.render(deltaTime);
+    } else {
+      this.renderer.render(this.scene, this.camera);
+    }
   }
 
   /**
@@ -161,6 +185,11 @@ export class SceneManager {
    */
   public dispose(): void {
     window.removeEventListener('resize', this.resizeHandler);
+
+    // Dispose post-processing
+    if (this.postProcessing) {
+      this.postProcessing.dispose();
+    }
 
     // Dispose renderer
     this.renderer.dispose();

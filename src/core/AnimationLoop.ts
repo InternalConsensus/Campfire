@@ -8,17 +8,18 @@
 import * as THREE from 'three';
 
 export type UpdateCallback = (deltaTime: number, elapsedTime: number) => void;
+export type RenderCallback = (deltaTime: number) => void;
 
 export interface AnimationLoopOptions {
   readonly onUpdate?: UpdateCallback;
-  readonly onRender?: () => void;
+  readonly onRender?: RenderCallback;
   readonly showFPS?: boolean;
 }
 
 export class AnimationLoop {
   private readonly clock: THREE.Clock;
   private readonly updateCallbacks: Set<UpdateCallback>;
-  private readonly renderCallback: (() => void) | null;
+  private readonly renderCallback: RenderCallback | null;
 
   private animationFrameId: number | null = null;
   private isRunning = false;
@@ -109,9 +110,9 @@ export class AnimationLoop {
       callback(deltaTime, elapsedTime);
     }
 
-    // Render
+    // Render (pass deltaTime for post-processing)
     if (this.renderCallback) {
-      this.renderCallback();
+      this.renderCallback(deltaTime);
     }
 
     // Update FPS counter
