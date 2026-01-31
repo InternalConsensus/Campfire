@@ -136,6 +136,10 @@ void main() {
   // Softer edges at low temperatures
   alpha *= smoothstep(0.0, 0.1, temp);
   
+  // Fade out at the very bottom to avoid edge artifacts
+  float bottomFade = smoothstep(0.0, 0.15, height);
+  alpha *= bottomFade;
+  
   // Subtle flicker animation
   float flicker = 0.9 + 0.1 * sin(uTime * 12.0 + height * 8.0 + angle * 3.0);
   alpha *= flicker;

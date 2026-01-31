@@ -157,8 +157,9 @@ export class PostProcessing {
     };
 
     // Create effect composer
+    // Use UnsignedByteType for better compatibility with software WebGL
     this.composer = new EffectComposer(renderer, {
-      frameBufferType: THREE.HalfFloatType,
+      frameBufferType: THREE.UnsignedByteType,
     });
 
     // Render pass (first in chain)
