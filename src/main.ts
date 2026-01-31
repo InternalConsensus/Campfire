@@ -16,6 +16,8 @@ import { createGround, createFirePit, disposeGround } from '@components/Ground';
 import { Fire } from '@components/Fire';
 import { EmberSystem } from '@components/EmberSystem';
 import { SmokeSystem } from '@components/SmokeSystem';
+import { GradientSky } from '@components/GradientSky';
+import { StarField } from '@components/StarField';
 import { seed } from '@utils/noise';
 
 // ============================================================================
@@ -56,6 +58,8 @@ interface AppState {
   teepee: THREE.Group;
   ground: THREE.Mesh;
   firePit: THREE.Mesh;
+  gradientSky: GradientSky;
+  starField: StarField;
 }
 
 let app: AppState | null = null;
@@ -104,6 +108,17 @@ function init(): AppState {
 
   // Configure renderer for shadows
   configureShadowRenderer(sceneManager.renderer);
+
+  // Gradient sky background (rendered first, behind everything)
+  const gradientSky = new GradientSky();
+  sceneManager.add(gradientSky.getObject());
+
+  // Star field with twinkling
+  const starField = new StarField();
+  sceneManager.add(starField.getObject());
+
+  // Add subtle atmospheric fog for depth
+  sceneManager.scene.fog = new THREE.FogExp2(0x080810, 0.015);
 
   // Initialize lighting system (fire light, moonlight, ambient)
   const lighting = new Lighting({
@@ -233,6 +248,9 @@ function init(): AppState {
     // Update lighting (flickering, position offset)
     lighting.update(deltaTime);
 
+    // Update star twinkling
+    starField.update(deltaTime);
+
     // Update camera controls
     cameraControls.update();
   });
@@ -251,6 +269,8 @@ function init(): AppState {
     teepee,
     ground,
     firePit,
+    gradientSky,
+    starField,
   };
 }
 
@@ -301,6 +321,8 @@ window.addEventListener('beforeunload', () => {
     app.embers.dispose();
     app.smoke.dispose();
     app.lighting.dispose();
+    app.gradientSky.dispose();
+    app.starField.dispose();
     
     // Dispose core systems
     app.animationLoop.dispose();

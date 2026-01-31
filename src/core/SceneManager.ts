@@ -44,7 +44,7 @@ export class SceneManager {
       options.fov ?? 50,
       this.getAspect(),
       options.near ?? 0.1,
-      options.far ?? 100
+      options.far ?? 200 // Extended for sky sphere and stars
     );
     this.camera.position.set(0, 3, 8);
     this.camera.lookAt(0, 1, 0);
