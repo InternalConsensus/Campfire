@@ -72,9 +72,9 @@ export class Fire {
     this.secondaryFire.scale.setScalar(0.85);
     this.secondaryFire.position.y = 0.05;
 
-    // Add to group
+    // Add to group - only primary for now to debug artifact
     this.group.add(this.primaryFire);
-    this.group.add(this.secondaryFire);
+    // this.group.add(this.secondaryFire); // DISABLED - debugging artifact
 
     // Position fire above ground level
     this.group.position.y = 0.1;
@@ -116,7 +116,8 @@ export class Fire {
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-      side: THREE.DoubleSide,
+      depthTest: true,
+      side: THREE.DoubleSide, // Render both sides
     });
 
     const mesh = new THREE.Mesh(geometry, material);

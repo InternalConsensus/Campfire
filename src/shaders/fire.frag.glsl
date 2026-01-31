@@ -1,141 +1,110 @@
 /**
  * Fire Fragment Shader
  * 
- * Creates volumetric fire effect using FBM noise with:
- * - Color ramp from white (core) to yellow to orange to red to black
- * - Alpha falloff at edges and top
- * - Animated noise scrolling upward
+ * Realistic fire effect using:
+ * - FBM noise for organic flame shapes
+ * - Proper flame color ramp (white core → yellow → orange → red → black)
+ * - Height and radial falloff
  */
 
 // Uniforms
-uniform float uTime;          // Time in seconds
-uniform float uIntensity;     // Overall fire intensity (0-1)
-uniform float uNoiseScale;    // Noise frequency multiplier
-uniform float uScrollSpeed;   // Upward scroll speed
-uniform vec3 uColorCore;      // Core color (white/yellow)
-uniform vec3 uColorMid;       // Middle color (orange)
-uniform vec3 uColorOuter;     // Outer color (red)
+uniform float uTime;
+uniform float uIntensity;
+uniform float uNoiseScale;
+uniform float uScrollSpeed;
 
-// Varyings from vertex shader
+// Varyings
 varying vec2 vUv;
 varying vec3 vPosition;
-varying vec3 vNormal;
 varying float vDisplacement;
 
 #include ./noise.glsl
 
-/**
- * Fire color ramp
- * Maps intensity (0-1) to fire colors:
- * 0.0 = black (edge/cool)
- * 0.3 = dark red
- * 0.5 = red/orange  
- * 0.7 = orange/yellow
- * 0.9 = yellow/white
- * 1.0 = white (core/hot)
- */
-vec3 fireColorRamp(float t) {
-  // Color stops
-  vec3 black = vec3(0.0, 0.0, 0.0);
-  vec3 darkRed = vec3(0.3, 0.0, 0.0);
-  vec3 red = vec3(0.545, 0.0, 0.0);      // 0x8b0000
-  vec3 orange = vec3(1.0, 0.27, 0.0);    // 0xff4500
-  vec3 yellow = vec3(1.0, 0.85, 0.0);    // 0xffd900
-  vec3 white = vec3(1.0, 0.95, 0.85);    // Warm white
-  
-  // Multi-stop gradient
-  vec3 color;
-  if (t < 0.2) {
-    color = mix(black, darkRed, t / 0.2);
-  } else if (t < 0.4) {
-    color = mix(darkRed, red, (t - 0.2) / 0.2);
-  } else if (t < 0.6) {
-    color = mix(red, orange, (t - 0.4) / 0.2);
-  } else if (t < 0.8) {
-    color = mix(orange, yellow, (t - 0.6) / 0.2);
-  } else {
-    color = mix(yellow, white, (t - 0.8) / 0.2);
-  }
-  
-  return color;
-}
-
 void main() {
-  // Normalized height (0 at bottom, 1 at top)
-  // Geometry height is passed as uniform or we use a reasonable estimate
+  // Normalized height (0 at base, 1 at tip)
   float height = clamp(vPosition.y / 2.2, 0.0, 1.0);
   
-  // Distance from center axis (radial falloff)
+  // Radial distance from center
   float radialDist = length(vPosition.xz);
   
-  // Calculate expected radius at this height (cone shape)
-  // Wider at bottom, narrower at top
-  float expectedRadius = mix(0.5, 0.1, height);
-  float radialFalloff = 1.0 - smoothstep(0.0, expectedRadius, radialDist);
+  // Create flame shape - wider at bottom, narrower at top
+  float flameWidth = mix(0.5, 0.08, pow(height, 0.7));
+  float radialFalloff = 1.0 - smoothstep(0.0, flameWidth, radialDist);
   
-  // =========================================================================
-  // Noise-based fire pattern
-  // =========================================================================
-  
-  // Scroll noise upward over time
-  float scrollOffset = uTime * uScrollSpeed;
-  
-  // Multi-octave noise for fire turbulence
+  // Scrolling noise coordinates for upward flame movement
   vec3 noisePos = vec3(
     vPosition.x * uNoiseScale,
-    vPosition.y * uNoiseScale * 0.8 - scrollOffset,
+    vPosition.y * uNoiseScale * 0.8 - uTime * uScrollSpeed,
     vPosition.z * uNoiseScale
   );
   
-  // Layer multiple noise frequencies
-  float noise1 = fbm(noisePos, 4);
-  float noise2 = fbm(noisePos * 2.0 + vec3(0.0, scrollOffset * 0.5, 0.0), 3);
-  float noise3 = turbulence(noisePos * 4.0, 2);
+  // Multi-octave noise for turbulent flames
+  float n1 = snoise(noisePos) * 0.5 + 0.5;
+  float n2 = snoise(noisePos * 2.0 + 100.0) * 0.5 + 0.5;
+  float n3 = snoise(noisePos * 4.0 + 200.0) * 0.5 + 0.5;
+  float turbulence = n1 * 0.5 + n2 * 0.3 + n3 * 0.2;
   
-  // Combine noise layers
-  float fireNoise = noise1 * 0.5 + noise2 * 0.3 + noise3 * 0.2;
+  // Flame mask combines radial falloff with noise
+  float flameMask = radialFalloff * (0.5 + turbulence * 0.8);
   
-  // =========================================================================
-  // Fire intensity calculation
-  // =========================================================================
+  // Height fade - flames disappear toward tip
+  float heightFade = 1.0 - pow(height, 1.5);
   
-  // Base intensity from radial and height falloff
-  float baseIntensity = radialFalloff;
+  // Core brightness - hottest at center bottom
+  float core = (1.0 - radialDist / 0.3) * (1.0 - height * 0.8);
+  core = clamp(core, 0.0, 1.0);
+  core = pow(core, 1.5);
   
-  // Reduce intensity at the top (flames dissipating) - more gradual
-  float topFalloff = 1.0 - smoothstep(0.4, 0.95, height);
-  baseIntensity *= topFalloff;
+  // Final intensity
+  float intensity = flameMask * heightFade;
+  intensity = clamp(intensity * uIntensity, 0.0, 1.0);
   
-  // Add noise variation - more turbulent
-  float intensity = baseIntensity + fireNoise * 0.5;
+  // Temperature for color ramp (0 = cold/edge, 1 = hot/core)
+  float temp = intensity * 0.7 + core * 0.5;
+  temp = clamp(temp + turbulence * 0.2 - 0.1, 0.0, 1.0);
   
-  // Hotter core - stronger effect
-  float coreFactor = 1.0 - smoothstep(0.0, 0.35, radialDist);
-  intensity += coreFactor * 0.4 * (1.0 - height * 0.5);
-  // =========================================================================
-  // Color and alpha
-  // =========================================================================
+  // =========================================
+  // Fire Color Ramp (physically-inspired)
+  // =========================================
+  vec3 color;
   
-  // Get color from ramp
-  vec3 color = fireColorRamp(intensity);
+  // Smoother color transitions using mix
+  vec3 black = vec3(0.0, 0.0, 0.0);
+  vec3 darkRed = vec3(0.3, 0.0, 0.0);
+  vec3 red = vec3(0.7, 0.1, 0.0);
+  vec3 orange = vec3(1.0, 0.45, 0.0);
+  vec3 yellow = vec3(1.0, 0.8, 0.2);
+  vec3 white = vec3(1.0, 0.95, 0.8);
   
-  // Boost brightness for additive blending - more punch
-  color *= 1.5;
+  if (temp < 0.2) {
+    color = mix(black, darkRed, temp / 0.2);
+  } else if (temp < 0.4) {
+    color = mix(darkRed, red, (temp - 0.2) / 0.2);
+  } else if (temp < 0.6) {
+    color = mix(red, orange, (temp - 0.4) / 0.2);
+  } else if (temp < 0.8) {
+    color = mix(orange, yellow, (temp - 0.6) / 0.2);
+  } else {
+    color = mix(yellow, white, (temp - 0.8) / 0.2);
+  }
   
-  // Alpha based on intensity with smooth falloff
-  float alpha = smoothstep(0.05, 0.25, intensity);
+  // Boost brightness for HDR/bloom pickup
+  color *= 1.0 + core * 0.5;
   
-  // Additional alpha falloff at edges - softer
-  alpha *= pow(radialFalloff, 0.7);
+  // =========================================
+  // Alpha - soft edges, height fade
+  // =========================================
+  float alpha = radialFalloff * heightFade;
+  alpha *= 0.6 + turbulence * 0.5;
   
-  // Fade out at very top - more gradual
-  alpha *= 1.0 - smoothstep(0.7, 1.0, height);
-  
-  // Flicker effect - subtle
-  float flicker = 0.92 + 0.08 * sin(uTime * 12.0 + vPosition.y * 4.0);
-  flicker *= 0.95 + 0.05 * sin(uTime * 23.0);
+  // Subtle flicker
+  float flicker = 0.95 + 0.05 * sin(uTime * 12.0 + vPosition.y * 8.0);
   alpha *= flicker;
   
-  // Final output
-  gl_FragColor = vec4(color, alpha * uIntensity);
+  alpha = clamp(alpha * uIntensity, 0.0, 0.95);
+  
+  // Discard nearly invisible fragments
+  if (alpha < 0.01) discard;
+  
+  gl_FragColor = vec4(color, alpha);
 }

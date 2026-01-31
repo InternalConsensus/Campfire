@@ -29,12 +29,12 @@ const DEFAULT_GROUND_OPTIONS: Required<Omit<GroundOptions, 'seed'>> = {
 };
 
 /**
- * Create ground material
+ * Create ground material - dark earth with subtle warmth from firelight
  */
 export function createGroundMaterial(): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
-    color: 0x1a1208,
-    roughness: 0.95,
+    color: 0x1f1510,
+    roughness: 0.98,
     metalness: 0.0,
   });
 }

@@ -55,26 +55,28 @@ const DEFAULT_LOG_OPTIONS: Required<Omit<LogOptions, 'seed'>> = {
 };
 
 /**
- * Create log material with brown wood color
+ * Create log material with dark brown wood color and subtle fire glow
  */
 export function createLogMaterial(): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
-    color: 0x3d2817,
-    roughness: 0.9,
+    color: 0x2a1810,
+    roughness: 0.92,
     metalness: 0.0,
+    emissive: 0x220800,
+    emissiveIntensity: 0.15,
   });
 }
 
 /**
- * Create charred log material for logs touching fire
+ * Create charred log material for logs touching fire - glowing embers
  */
 export function createCharredLogMaterial(): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
-    color: 0x1a0f0a,
+    color: 0x0f0805,
     roughness: 0.95,
     metalness: 0.0,
-    emissive: 0x331100,
-    emissiveIntensity: 0.1,
+    emissive: 0x441100,
+    emissiveIntensity: 0.3,
   });
 }
 

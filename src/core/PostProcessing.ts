@@ -89,10 +89,10 @@ interface PostProcessingConfig {
 /** Default post-processing configuration */
 const DEFAULT_CONFIG: PostProcessingConfig = {
   bloom: {
-    intensity: 1.5,
-    luminanceThreshold: 0.4,
-    luminanceSmoothing: 0.3,
-    kernelSize: KernelSize.LARGE,
+    intensity: 0.8,
+    luminanceThreshold: 0.7,
+    luminanceSmoothing: 0.4,
+    kernelSize: KernelSize.MEDIUM,
     mipmapBlur: true,
   },
   dof: {
@@ -101,18 +101,18 @@ const DEFAULT_CONFIG: PostProcessingConfig = {
     bokehScale: 3.0,
   },
   vignette: {
-    offset: 0.35,
-    darkness: 0.5,
+    offset: 0.45,
+    darkness: 0.35,
   },
   grain: {
     enabled: true,
-    blendFunction: BlendFunction.OVERLAY,
+    blendFunction: BlendFunction.SOFT_LIGHT,
   },
   chromatic: {
     offset: new THREE.Vector2(0.001, 0.001),
     radialModulation: true,
   },
-  enableSMAA: true,
+  enableSMAA: false, // Disabled - causes color fringing on transparent fire
   enableToneMapping: true,
 };
 
@@ -190,9 +190,9 @@ export class PostProcessing {
     });
     this.noiseEffect.blendMode.opacity.value = 0.15;
 
-    // SMAA anti-aliasing
+    // SMAA anti-aliasing (MEDIUM for balance of quality/performance)
     this.smaaEffect = this.config.enableSMAA
-      ? new SMAAEffect({ preset: SMAAPreset.HIGH })
+      ? new SMAAEffect({ preset: SMAAPreset.MEDIUM })
       : null;
 
     // Tone mapping (ACESFilmic for cinematic look)

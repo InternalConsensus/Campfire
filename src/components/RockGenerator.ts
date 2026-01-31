@@ -49,13 +49,13 @@ const DEFAULT_ROCK_OPTIONS: Required<Omit<RockOptions, 'seed' | 'scaleVariation'
 };
 
 /**
- * Create rock material with dark gray color
+ * Create rock material with warm gray color
  */
 export function createRockMaterial(): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
-    color: 0x2a2a2a,
-    roughness: 0.8,
-    metalness: 0.1,
+    color: 0x4a4540,
+    roughness: 0.85,
+    metalness: 0.05,
     flatShading: true, // Gives rocks a faceted look
   });
 }
