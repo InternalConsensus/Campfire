@@ -89,10 +89,10 @@ interface PostProcessingConfig {
 /** Default post-processing configuration */
 const DEFAULT_CONFIG: PostProcessingConfig = {
   bloom: {
-    intensity: 0.8,
-    luminanceThreshold: 0.7,
-    luminanceSmoothing: 0.4,
-    kernelSize: KernelSize.MEDIUM,
+    intensity: 0.5,
+    luminanceThreshold: 0.85,
+    luminanceSmoothing: 0.3,
+    kernelSize: KernelSize.SMALL,
     mipmapBlur: true,
   },
   dof: {
@@ -157,8 +157,9 @@ export class PostProcessing {
     };
 
     // Create effect composer
+    // Use UnsignedByteType for better compatibility with software WebGL
     this.composer = new EffectComposer(renderer, {
-      frameBufferType: THREE.HalfFloatType,
+      frameBufferType: THREE.UnsignedByteType,
     });
 
     // Render pass (first in chain)
@@ -177,6 +178,8 @@ export class PostProcessing {
       kernelSize: this.config.bloom.kernelSize,
       mipmapBlur: this.config.bloom.mipmapBlur,
     });
+    // Re-enabled bloom with reduced intensity
+    this.bloomEffect.blendMode.opacity.value = 0.6;
 
     // Vignette for cinematic framing
     this.vignetteEffect = new VignetteEffect({

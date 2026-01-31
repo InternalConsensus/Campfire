@@ -142,6 +142,7 @@ export class EmberSystem {
     this.points = new THREE.Points(this.geometry, this.material);
     this.points.frustumCulled = false;
     this.points.name = 'embers';
+    this.points.renderOrder = 15; // Render after fire (10) but before smoke
     
     // Initial spawn burst
     for (let i = 0; i < Math.floor(count * 0.3); i++) {
