@@ -48,8 +48,8 @@ void main() {
   // =========================================
   vec3 brightYellow = vec3(1.0, 0.85, 0.3);
   vec3 brightOrange = vec3(1.0, 0.4, 0.1);
-  vec3 darkRed = vec3(0.5, 0.1, 0.0);
-  vec3 dead = vec3(0.2, 0.05, 0.0);
+  vec3 dimOrange = vec3(0.5, 0.1, 0.0);    // Cooling ember
+  vec3 fadingEmber = vec3(0.2, 0.05, 0.0); // Nearly extinguished
   
   // Smooth interpolation between colors
   vec3 color;
@@ -58,10 +58,10 @@ void main() {
     color = mix(brightOrange, brightYellow, t);
   } else if (life > 0.3) {
     float t = (life - 0.3) / 0.4;
-    color = mix(darkRed, brightOrange, t);
+    color = mix(dimOrange, brightOrange, t);
   } else {
     float t = life / 0.3;
-    color = mix(dead, darkRed, t);
+    color = mix(fadingEmber, dimOrange, t);
   }
   
   // Add white-hot core for fresh embers
