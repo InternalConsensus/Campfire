@@ -7,6 +7,8 @@
  * - Additive blending for glow effect
  */
 
+precision highp float;
+
 // Varyings from vertex shader
 varying float vLife;
 varying float vFlicker;
@@ -14,31 +16,12 @@ varying float vFlicker;
 // Uniforms
 uniform float uTime;
 
-/**
- * Ember color ramp based on life
- * Life 1.0 (fresh) = bright yellow-orange
- * Life 0.5 = orange
- * Life 0.0 (dying) = dark red
- */
-vec3 emberColorRamp(float life) {
-  vec3 brightYellow = vec3(1.0, 0.85, 0.3);   // Hot ember
-  vec3 brightOrange = vec3(1.0, 0.4, 0.1);    // 0xff6600 equivalent
-  vec3 darkRed = vec3(0.24, 0.0, 0.0);        // 0x3d0000
-  vec3 dead = vec3(0.1, 0.02, 0.0);           // Nearly extinguished
-  
-  vec3 color;
-  if (life > 0.7) {
-    color = mix(brightOrange, brightYellow, (life - 0.7) / 0.3);
-  } else if (life > 0.3) {
-    color = mix(darkRed, brightOrange, (life - 0.3) / 0.4);
-  } else {
-    color = mix(dead, darkRed, life / 0.3);
+void main() {
+  // Early discard for dead particles (life <= 0)
+  if (vLife <= 0.0) {
+    discard;
   }
   
-  return color;
-}
-
-void main() {
   // Calculate distance from center of point sprite
   // gl_PointCoord is (0,0) at top-left, (1,1) at bottom-right
   vec2 center = gl_PointCoord - vec2(0.5);
@@ -49,6 +32,9 @@ void main() {
     discard;
   }
   
+  // Clamp life to valid range
+  float life = clamp(vLife, 0.01, 1.0);
+  
   // Soft circular falloff for glow effect
   float alpha = 1.0 - smoothstep(0.0, 1.0, dist);
   alpha = pow(alpha, 0.7); // Sharpen slightly for more defined core
@@ -56,22 +42,49 @@ void main() {
   // Hot core effect - brighter in center
   float core = 1.0 - smoothstep(0.0, 0.4, dist);
   
-  // Get base color from life
-  vec3 color = emberColorRamp(vLife);
+  // =========================================
+  // Ember color ramp based on life
+  // All colors are in the warm spectrum (reds, oranges, yellows)
+  // =========================================
+  vec3 brightYellow = vec3(1.0, 0.85, 0.3);
+  vec3 brightOrange = vec3(1.0, 0.4, 0.1);
+  vec3 darkRed = vec3(0.5, 0.1, 0.0);
+  vec3 dead = vec3(0.2, 0.05, 0.0);
+  
+  // Smooth interpolation between colors
+  vec3 color;
+  if (life > 0.7) {
+    float t = (life - 0.7) / 0.3;
+    color = mix(brightOrange, brightYellow, t);
+  } else if (life > 0.3) {
+    float t = (life - 0.3) / 0.4;
+    color = mix(darkRed, brightOrange, t);
+  } else {
+    float t = life / 0.3;
+    color = mix(dead, darkRed, t);
+  }
   
   // Add white-hot core for fresh embers
   vec3 white = vec3(1.0, 0.95, 0.85);
-  color = mix(color, white, core * vLife * 0.5);
+  color = mix(color, white, core * life * 0.4);
   
   // Boost brightness for additive blending
-  color *= 1.3;
+  color *= 1.2;
   
   // Apply flicker to alpha
-  float flicker = 0.9 + 0.1 * sin(uTime * 15.0 + vFlicker * 6.28);
+  float flicker = 0.85 + 0.15 * sin(uTime * 12.0 + vFlicker * 6.28);
   alpha *= flicker;
   
   // Fade out as ember dies
-  alpha *= smoothstep(0.0, 0.15, vLife);
+  alpha *= smoothstep(0.0, 0.15, life);
+  
+  // Final alpha clamp
+  alpha = clamp(alpha, 0.0, 1.0);
+  
+  // Discard very low alpha
+  if (alpha < 0.01) {
+    discard;
+  }
   
   gl_FragColor = vec4(color, alpha);
 }
