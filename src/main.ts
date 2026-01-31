@@ -204,14 +204,14 @@ function init(): AppState {
 
   // Ember particle system
   const embers = new EmberSystem({
-    count: 800,
+    count: 150,
     origin: new THREE.Vector3(0, 0.8, 0),
     spawnRadius: 0.35,
-    minLife: 2.5,
-    maxLife: 4.5,
-    minSize: 15,
-    maxSize: 35,
-    spawnRate: 60,
+    minLife: 2.0,
+    maxLife: 3.5,
+    minSize: 2,
+    maxSize: 6,
+    spawnRate: 12,
   });
   sceneManager.add(embers.getObject());
 

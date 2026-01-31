@@ -1,10 +1,10 @@
 /**
  * Ember Fragment Shader
  * 
- * Renders ember particles as glowing circular points with:
- * - Circular shape with soft edges
+ * Renders ember particles as small, bright spark points with:
+ * - Sharp circular core with fast falloff
  * - Color gradient from bright yellow/orange to dark red based on life
- * - Additive blending for glow effect
+ * - Subtle glow that doesn't overpower the fire
  */
 
 precision highp float;
@@ -35,12 +35,14 @@ void main() {
   // Clamp life to valid range
   float life = clamp(vLife, 0.01, 1.0);
   
-  // Soft circular falloff for glow effect
-  float alpha = 1.0 - smoothstep(0.0, 1.0, dist);
-  alpha = pow(alpha, 0.7); // Sharpen slightly for more defined core
+  // Sharp spark-like falloff - bright core that drops off quickly
+  // This creates a small hot point rather than a soft glow
+  float alpha = 1.0 - smoothstep(0.0, 0.5, dist);
+  alpha = pow(alpha, 2.0); // Sharper falloff for spark-like appearance
   
-  // Hot core effect - brighter in center
-  float core = 1.0 - smoothstep(0.0, 0.4, dist);
+  // Calculate core intensity for center brightness
+  float core = 1.0 - smoothstep(0.0, 0.2, dist);
+  core = pow(core, 1.5);
   
   // =========================================
   // Ember color ramp based on life
@@ -65,11 +67,9 @@ void main() {
   }
   
   // Add white-hot core for fresh embers
+  // 0.6 = core intensity multiplier for white-hot center
   vec3 white = vec3(1.0, 0.95, 0.85);
-  color = mix(color, white, core * life * 0.4);
-  
-  // Boost brightness for additive blending
-  color *= 1.2;
+  color = mix(color, white, core * life * 0.6);
   
   // Apply flicker to alpha
   float flicker = 0.85 + 0.15 * sin(uTime * 12.0 + vFlicker * 6.28);
@@ -77,6 +77,10 @@ void main() {
   
   // Fade out as ember dies
   alpha *= smoothstep(0.0, 0.15, life);
+  
+  // Scale down overall alpha so embers complement rather than overpower the fire
+  // 0.7 = 70% brightness to let flame shader show through
+  alpha *= 0.7;
   
   // Final alpha clamp
   alpha = clamp(alpha, 0.0, 1.0);
